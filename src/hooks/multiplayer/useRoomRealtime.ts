@@ -28,14 +28,7 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
   const refreshParticipants = useCallback(async () => {
     if (!roomId) return;
 
-    console.log('[useRoomRealtime] refreshParticipants 시작:', roomId);
     const { participants: fetchedParticipants, error } = await getRoomParticipants(roomId);
-
-    console.log('[useRoomRealtime] refreshParticipants 결과:', { 
-      count: fetchedParticipants?.length || 0, 
-      error: error,
-      participants: fetchedParticipants?.map(p => ({ id: p.user_id, nickname: p.user?.nickname }))
-    });
 
     if (!error && fetchedParticipants) {
       // 데이터가 실제로 변경되었을 때만 상태 업데이트 (불필요한 리렌더링 방지)
@@ -44,10 +37,8 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
         const newHash = JSON.stringify(fetchedParticipants.map(p => p.user_id).sort());
         
         if (prevHash !== newHash) {
-          console.log('[useRoomRealtime] 참가자 목록 업데이트:', fetchedParticipants.length, '명 (변경 감지)');
           return fetchedParticipants;
         } else {
-          console.log('[useRoomRealtime] 참가자 목록 변경 없음, 업데이트 스킵');
           return prev;
         }
       });
@@ -70,7 +61,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
         .single();
 
       if (error || !data) {
-        console.log('[useRoomRealtime] 방이 존재하지 않음:', roomId);
         return false;
       }
 
@@ -95,7 +85,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
         .single();
 
       if (error || !data) {
-        console.log('[useRoomRealtime] 방 상태 확인 실패:', error);
         return null;
       }
 
@@ -112,7 +101,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
   const loadGameSessions = useCallback(async () => {
     if (!roomId) return;
     
-    console.log('[useRoomRealtime] 게임 세션 로드');
     const { data, error } = await supabase
       .from('game_sessions')
       .select('*, users(id, nickname)')
@@ -149,8 +137,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
       }));
       
       // 항상 업데이트 (점수 동기화를 위해)
-      console.log('[useRoomRealtime] 게임 세션 로드 완료:', sessions.length, '개');
-      console.log('[useRoomRealtime] 세션 점수:', sessions.map(s => ({ userId: s.user_id, score: s.score, nickname: s.user?.nickname })));
       setGameSessions(sessions);
     } else if (error) {
       console.error('[useRoomRealtime] 게임 세션 로드 실패:', error);
@@ -163,23 +149,14 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
   const loadCurrentProblem = useCallback(async () => {
     if (!roomId) return;
     
-    console.log('[useRoomRealtime] 현재 문제 로드 시작:', roomId);
     const { problem, error } = await getRoomProblem(roomId);
     
-    console.log('[useRoomRealtime] 현재 문제 로드 결과:', { 
-      hasProblem: !!problem, 
-      problemText: problem?.problem,
-      error: error 
-    });
-    
     if (!error && problem) {
-      console.log('[useRoomRealtime] 현재 문제 로드 완료:', problem.problem);
       setCurrentProblem(problem);
     } else if (error) {
       console.error('[useRoomRealtime] 현재 문제 로드 실패:', error);
     } else {
       // 문제가 없으면 null로 설정
-      console.log('[useRoomRealtime] 문제 없음');
       setCurrentProblem(null);
     }
   }, [roomId]);
@@ -205,15 +182,12 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
     let problemCheckInterval: NodeJS.Timeout | undefined;
 
     const setupRealtimeSubscriptions = async () => {
-      console.log('[useRoomRealtime] 실시간 구독 설정 시작:', roomId);
-      
       // 초기 참가자 목록 및 방 상태 로드
       await refreshParticipants();
       
       // 초기 방 상태 로드
       const initialStatus = await checkRoomStatus();
       if (initialStatus) {
-        console.log('[useRoomRealtime] 초기 방 상태:', initialStatus);
         setRoomStatus(initialStatus);
       }
 
@@ -222,12 +196,10 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
       
       // 문제 주기적 확인 (실시간 구독이 실패할 경우 대비)
       problemCheckInterval = setInterval(async () => {
-        console.log('[useRoomRealtime] 문제 주기적 확인');
         await loadCurrentProblem();
       }, 2000);
 
       // 방 상태 실시간 구독 (UPDATE 및 DELETE)
-      console.log('[useRoomRealtime] 방 상태 구독 설정');
       roomChannel = supabase
         .channel(`room:${roomId}`)
         .on(
@@ -239,12 +211,10 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
             filter: `id=eq.${roomId}`,
           },
           async (payload) => {
-            console.log('[useRoomRealtime] 방 상태 변경:', payload.new);
             const updatedRoom = payload.new as any;
             setRoomStatus(updatedRoom.status);
             
             // 문제 정보도 업데이트
-            console.log('[useRoomRealtime] current_problem 확인:', updatedRoom.current_problem);
             if (updatedRoom.current_problem) {
               const problemData = updatedRoom.current_problem as any;
               const problem: Droplet = {
@@ -262,40 +232,33 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               // createdAt 정보도 포함 (중복 체크용)
               (problem as any).createdAt = problemData.createdAt || new Date().toISOString();
               
-              console.log('[useRoomRealtime] 문제 업데이트:', problem.problem, 'x:', problem.x, 'createdAt:', (problem as any).createdAt);
               setCurrentProblem(problem);
             } else {
-              console.log('[useRoomRealtime] 문제 없음, null로 설정');
-            setCurrentProblem(null);
+              setCurrentProblem(null);
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'rooms',
-          filter: `id=eq.${roomId}`,
-        },
-        () => {
-          console.log('[useRoomRealtime] 방이 삭제되었습니다');
-          setRoomStatus('deleted');
-          // 방이 삭제되면 참가자 목록도 초기화
-          setParticipants([]);
-        }
-      )
-      .subscribe((status) => {
-        console.log('[useRoomRealtime] 방 상태 구독 상태:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[useRoomRealtime] 방 상태 구독 성공');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.error('[useRoomRealtime] 방 상태 구독 실패:', status);
-        }
-      });
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'rooms',
+            filter: `id=eq.${roomId}`,
+          },
+          () => {
+            setRoomStatus('deleted');
+            // 방이 삭제되면 참가자 목록도 초기화
+            setParticipants([]);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error('[useRoomRealtime] 방 상태 구독 실패:', status);
+          }
+        });
 
       // 참가자 실시간 구독 (INSERT, UPDATE, DELETE)
-      console.log('[useRoomRealtime] 참가자 구독 설정');
       participantsChannel = supabase
         .channel(`room_participants:${roomId}`)
         .on(
@@ -306,8 +269,7 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
             table: 'room_participants',
             filter: `room_id=eq.${roomId}`,
           },
-          async (payload) => {
-            console.log('[useRoomRealtime] 참가자 추가:', payload.new);
+          async () => {
             // 참가자 목록 새로고침
             await refreshParticipants();
           }
@@ -320,17 +282,13 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
             table: 'room_participants',
             filter: `room_id=eq.${roomId}`,
           },
-          async (payload) => {
-            console.log('[useRoomRealtime] 참가자 삭제:', payload.old);
+          async () => {
             // 참가자 목록 새로고침
             await refreshParticipants();
           }
         )
         .subscribe((status) => {
-          console.log('[useRoomRealtime] 참가자 구독 상태:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('[useRoomRealtime] 참가자 구독 성공');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.error('[useRoomRealtime] 참가자 구독 실패:', status);
           }
         });
@@ -347,7 +305,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
             filter: `room_id=eq.${roomId}`,
           },
           async (payload) => {
-            console.log('[useRoomRealtime] 게임 세션 추가:', payload.new);
             const newSession = payload.new as GameSession;
 
             // 사용자 정보 조회
@@ -372,7 +329,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               // 중복 체크 (같은 ID 또는 같은 사용자의 더 최신 세션이 있으면 스킵)
               const existingById = prev.find((s) => s.id === sessionWithUser.id);
               if (existingById) {
-                console.log('[useRoomRealtime] 동일 ID 세션 존재, 스킵:', sessionWithUser.id);
                 return prev;
               }
               
@@ -381,15 +337,12 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               if (existingByUser) {
                 // 새 세션이 더 최신이면 교체, 아니면 스킵
                 if (new Date(sessionWithUser.played_at) > new Date(existingByUser.played_at)) {
-                  console.log('[useRoomRealtime] 사용자 세션 교체:', sessionWithUser.user_id, existingByUser.score, '->', sessionWithUser.score);
                   const filtered = prev.filter(s => s.user_id !== sessionWithUser.user_id);
                   return [...filtered, sessionWithUser].sort((a, b) => b.score - a.score);
                 }
-                console.log('[useRoomRealtime] 기존 세션이 더 최신, 스킵:', sessionWithUser.user_id);
                 return prev;
               }
               
-              console.log('[useRoomRealtime] 새 세션 추가 (INSERT):', sessionWithUser.user_id, sessionWithUser.score);
               return [...prev, sessionWithUser].sort((a, b) => b.score - a.score);
             });
           }
@@ -403,7 +356,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
             filter: `room_id=eq.${roomId}`,
           },
           async (payload) => {
-            console.log('[useRoomRealtime] 게임 세션 업데이트:', payload.new);
             const updatedSession = payload.new as GameSession;
 
             // 사용자 정보 조회
@@ -430,25 +382,19 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               if (existingIndex >= 0) {
                 // 점수가 변경되지 않았으면 업데이트 스킵
                 if (prev[existingIndex].score === sessionWithUser.score) {
-                  console.log('[useRoomRealtime] 점수 변경 없음, 업데이트 스킵:', sessionWithUser.user_id, sessionWithUser.score);
                   return prev;
                 }
-                console.log('[useRoomRealtime] 세션 점수 업데이트:', sessionWithUser.user_id, prev[existingIndex].score, '->', sessionWithUser.score);
                 const updated = [...prev];
                 updated[existingIndex] = sessionWithUser;
                 return updated.sort((a, b) => b.score - a.score);
               } else {
-                console.log('[useRoomRealtime] 새 세션 추가:', sessionWithUser.user_id, sessionWithUser.score);
                 return [...prev, sessionWithUser].sort((a, b) => b.score - a.score);
               }
             });
           }
         )
         .subscribe((status) => {
-          console.log('[useRoomRealtime] 게임 세션 구독 상태:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('[useRoomRealtime] 게임 세션 구독 성공');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.error('[useRoomRealtime] 게임 세션 구독 실패:', status);
           }
         });
@@ -457,25 +403,19 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
       await loadGameSessions();
 
       // 참가자 목록 3초마다 자동 갱신
-      console.log('[useRoomRealtime] 참가자 목록 자동 갱신 시작 (3초 간격)');
       participantsInterval = setInterval(async () => {
-        console.log('[useRoomRealtime] 자동 갱신: 참가자 목록 새로고침');
         await refreshParticipants();
       }, 3000);
 
-      // 게임 세션 1초마다 자동 갱신 (실시간 점수 동기화) - 주기 단축으로 실시간성 향상
-      console.log('[useRoomRealtime] 게임 세션 자동 갱신 시작 (1초 간격)');
+      // 게임 세션 1초마다 자동 갱신 (실시간 점수 동기화)
       sessionsRefreshInterval = setInterval(async () => {
-        console.log('[useRoomRealtime] 자동 갱신: 게임 세션 새로고침');
         await loadGameSessions();
       }, 1000);
 
       // 방 존재 여부 및 상태 2초마다 확인 (방 삭제 감지 및 상태 동기화)
-      console.log('[useRoomRealtime] 방 존재 여부 및 상태 확인 시작 (2초 간격)');
       roomCheckInterval = setInterval(async () => {
         const exists = await checkRoomExists();
         if (!exists) {
-          console.log('[useRoomRealtime] 방이 삭제됨 (주기적 확인)');
           setRoomStatus('deleted');
           setParticipants([]);
           // 인터벌 정리
@@ -489,7 +429,6 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
         // 방 상태도 확인하여 실시간 구독이 실패한 경우 대비
         const currentStatus = await checkRoomStatus();
         if (currentStatus) {
-          console.log('[useRoomRealtime] 방 상태 확인 (폴링):', currentStatus);
           setRoomStatus(currentStatus);
         }
       }, 2000);

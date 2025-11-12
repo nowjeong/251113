@@ -42,16 +42,8 @@ export function useMultiplayerDroplets({
   // 실시간으로 받은 문제를 물방울로 추가
   // 방장이 게임 오버되어도 다른 플레이어를 위해 문제를 받아야 함
   useEffect(() => {
-    console.log('[useMultiplayerDroplets] currentProblem 변경:', { 
-      isGameActive, 
-      hasProblem: !!currentProblem,
-      problem: currentProblem?.problem,
-      roomStatus
-    });
-    
     // 방 상태가 'playing'이 아니면 문제 추가하지 않음
     if (roomStatus !== 'playing') {
-      console.log('[useMultiplayerDroplets] 방 상태가 playing이 아님, 문제 추가 스킵');
       return;
     }
     
@@ -59,7 +51,6 @@ export function useMultiplayerDroplets({
     // 하지만 화면에 표시는 하지 않음
     
     if (!currentProblem) {
-      console.log('[useMultiplayerDroplets] 문제 없음');
       // 문제가 없으면 lastProblemIdRef 초기화하여 다음 문제를 받을 수 있도록
       lastProblemIdRef.current = null;
       return;
@@ -67,7 +58,6 @@ export function useMultiplayerDroplets({
     
     // 게임이 비활성화되어 있으면 문제를 받지만 화면에 추가하지 않음
     if (!isGameActive) {
-      console.log('[useMultiplayerDroplets] 게임 비활성화, 문제는 받았지만 화면에 추가하지 않음');
       // lastProblemIdRef는 업데이트하여 다음 문제를 받을 수 있도록
       const problemCreatedAt = (currentProblem as any).createdAt || new Date().toISOString();
       const problemKey = `${currentProblem.multiplicand}×${currentProblem.multiplier}-${problemCreatedAt}`;
@@ -81,11 +71,9 @@ export function useMultiplayerDroplets({
     const problemKey = `${currentProblem.multiplicand}×${currentProblem.multiplier}-${problemCreatedAt}`;
     
     if (lastProblemIdRef.current === problemKey) {
-      console.log('[useMultiplayerDroplets] 이미 추가된 문제:', problemKey);
       return;
     }
 
-    console.log('[useMultiplayerDroplets] 새 문제 추가:', currentProblem.problem, 'x:', currentProblem.x, problemKey);
     lastProblemIdRef.current = problemKey;
     problemSpawnTimeRef.current = Date.now();
 
@@ -101,7 +89,6 @@ export function useMultiplayerDroplets({
       });
       
       if (exists) {
-        console.log('[useMultiplayerDroplets] 중복 문제 감지, 추가 스킵');
         return prev;
       }
 
@@ -114,7 +101,6 @@ export function useMultiplayerDroplets({
       // createdAt 정보도 포함
       (newDroplet as any).createdAt = problemCreatedAt;
       
-      console.log('[useMultiplayerDroplets] 물방울 추가 완료:', newDroplet.problem, 'x:', newDroplet.x, '총', prev.length + 1, '개');
       return [...prev, newDroplet];
     });
   }, [currentProblem, isGameActive, roomStatus]);
@@ -124,7 +110,6 @@ export function useMultiplayerDroplets({
   useEffect(() => {
     // 방 상태가 'playing'이 아니면 문제 생성 중단
     if (roomStatus !== 'playing') {
-      console.log('[useMultiplayerDroplets] 방 상태가 playing이 아님, 문제 생성 중단:', roomStatus);
       return;
     }
     
@@ -165,7 +150,6 @@ export function useMultiplayerDroplets({
 
       // 이전 문제가 있으면 제거하고 새 문제 생성 준비
       if (currentProblem) {
-        console.log('[useMultiplayerDroplets] 이전 문제 제거 후 새 문제 생성:', currentProblem.problem);
         // 문제 제거 전에 lastProblemIdRef 초기화하여 새 문제를 받을 수 있도록
         lastProblemIdRef.current = null;
         
@@ -177,7 +161,6 @@ export function useMultiplayerDroplets({
       }
 
       isGenerating = true;
-      console.log('[useMultiplayerDroplets] 방장이 새 문제 생성');
       lastSpawnTime = now;
       
       const { problem, error } = await generateRoomProblem(
@@ -190,8 +173,6 @@ export function useMultiplayerDroplets({
 
       if (error) {
         console.error('[useMultiplayerDroplets] 문제 생성 실패:', error);
-      } else if (problem) {
-        console.log('[useMultiplayerDroplets] 문제 생성 성공:', problem.problem);
       }
     };
 
@@ -237,7 +218,6 @@ export function useMultiplayerDroplets({
               if (currentProblem && 
                   droplet.multiplicand === currentProblem.multiplicand && 
                   droplet.multiplier === currentProblem.multiplier) {
-                console.log('[useMultiplayerDroplets] 문제가 떨어짐, 새 문제 받을 준비:', droplet.problem);
                 lastProblemIdRef.current = null;
               }
               // 로컬에서만 제거 (각 플레이어가 독립적으로 처리)
@@ -281,7 +261,6 @@ export function useMultiplayerDroplets({
     if (currentProblem && 
         lowestDroplet.multiplicand === currentProblem.multiplicand && 
         lowestDroplet.multiplier === currentProblem.multiplier) {
-      console.log('[useMultiplayerDroplets] 문제가 맞춰짐, 새 문제 받을 준비:', lowestDroplet.problem);
       lastProblemIdRef.current = null;
     }
     

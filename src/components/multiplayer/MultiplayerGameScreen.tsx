@@ -44,8 +44,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
     if (!user || gameEndedRef.current) return;
     gameEndedRef.current = true;
 
-    console.log('[MultiplayerGameScreen] 게임 종료, 최종 점수 저장 시작:', finalStats.score);
-    
     // 게임 기록 저장 - 재시도 로직 추가
     let retries = 5;
     let success = false;
@@ -68,7 +66,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 후 재시도
           }
         } else {
-          console.log('[MultiplayerGameScreen] 최종 점수 저장 성공:', finalStats.score);
           success = true;
         }
       } catch (error) {
@@ -88,7 +85,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
     // 저장 완료 후 잠시 대기 (DB 반영 시간 확보)
     await new Promise(resolve => setTimeout(resolve, success ? 1500 : 2500));
     
-    console.log('[MultiplayerGameScreen] 게임 오버 화면으로 이동');
     onGameOver();
   }
 
@@ -96,8 +92,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
   useEffect(() => {
     const initializeSession = async () => {
       if (!user) return;
-      
-      console.log('[MultiplayerGameScreen] 게임 시작, 세션 초기화');
       
       // 기존 세션 삭제 (같은 방에서 이전 게임 세션 제거)
       try {
@@ -109,8 +103,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
         
         if (deleteError) {
           console.error('[MultiplayerGameScreen] 기존 세션 삭제 실패:', deleteError);
-        } else {
-          console.log('[MultiplayerGameScreen] 기존 세션 삭제 완료');
         }
       } catch (error) {
         console.error('[MultiplayerGameScreen] 기존 세션 삭제 중 오류:', error);
@@ -126,7 +118,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
           0,
           room.difficulty
         );
-        console.log('[MultiplayerGameScreen] 초기 세션 생성 완료');
       } catch (error) {
         console.error('[MultiplayerGameScreen] 초기 세션 생성 실패:', error);
       }
@@ -146,7 +137,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
       
       // 점수가 변경되었을 때만 업데이트
       if (stats.score !== lastScoreUpdateRef.current) {
-        console.log('[MultiplayerGameScreen] 실시간 점수 업데이트:', stats.score);
         lastScoreUpdateRef.current = stats.score;
         
         // 세션 업데이트 (게임 중간 점수 동기화용) - 재시도 로직 추가
@@ -171,7 +161,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
                 await new Promise(resolve => setTimeout(resolve, 500)); // 0.5초 후 재시도
               }
             } else {
-              console.log('[MultiplayerGameScreen] 실시간 점수 업데이트 성공:', stats.score, '세션 ID:', result.session?.id);
               success = true;
             }
           } catch (error) {
@@ -202,7 +191,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
   // 방 삭제 감지
   useEffect(() => {
     if (roomStatus === 'deleted') {
-      console.log('[MultiplayerGameScreen] 방이 삭제됨, 게임 종료');
       alert('방장이 방을 나가서 방이 삭제되었습니다.');
       onGameOver();
     }
@@ -267,7 +255,6 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
     // 게임 세션에서 점수 매핑 (모든 플레이어 포함)
     gameSessions.forEach(session => {
       scoreMap.set(session.user_id, session.score);
-      console.log('[MultiplayerGameScreen] 게임 세션 점수:', session.user_id, '=>', session.score);
     });
     
     // 현재 플레이어도 gameSessions에서 가져오되, 없으면 로컬 점수 사용
@@ -275,32 +262,22 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
       const sessionScore = gameSessions.find(s => s.user_id === user.id)?.score;
       if (sessionScore !== undefined) {
         scoreMap.set(user.id, sessionScore);
-        console.log('[MultiplayerGameScreen] 현재 플레이어 점수 (DB):', sessionScore);
       } else {
         scoreMap.set(user.id, stats.score);
-        console.log('[MultiplayerGameScreen] 현재 플레이어 점수 (로컬):', stats.score);
       }
     }
     
-    console.log('[MultiplayerGameScreen] 전체 점수 맵:', Array.from(scoreMap.entries()));
     return scoreMap;
   }, [gameSessions, user?.id, stats.score]);
 
   // 정렬된 참가자 목록 (메모이제이션)
   const sortedParticipants = useMemo(() => {
-    const sorted = participants
-      .map((p) => {
-        const score = participantScores.get(p.user_id) || 0;
-        console.log('[MultiplayerGameScreen] 참가자 정렬:', p.user?.nickname, '=>', score);
-        return {
-          ...p,
-          currentScore: score,
-        };
-      })
+    return participants
+      .map((p) => ({
+        ...p,
+        currentScore: participantScores.get(p.user_id) || 0,
+      }))
       .sort((a, b) => b.currentScore - a.currentScore);
-    
-    console.log('[MultiplayerGameScreen] 정렬된 참가자:', sorted.map(p => ({ nickname: p.user?.nickname, score: p.currentScore })));
-    return sorted;
   }, [participants, participantScores]);
 
   return (
@@ -336,34 +313,23 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
           <h3>👥 실시간 점수</h3>
           <div className="score-list">
             {sortedParticipants.length > 0 ? (
-              sortedParticipants.map((participant, index) => {
-                const score = participantScores.get(participant.user_id) || 0;
-                console.log('[MultiplayerGameScreen] 참가자 점수 렌더링:', participant.user_id, '=>', score);
-                return (
-                  <div
-                    key={participant.id}
-                    className={`score-item ${participant.user_id === user?.id ? 'my-score' : ''}`}
-                  >
-                    <span className="rank">{index + 1}위</span>
-                    <span className="name">
-                      {participant.user?.nickname || '익명'}
-                      {participant.user_id === user?.id && ' (나)'}
-                    </span>
-                    <span className="score">{score}점</span>
-                  </div>
-                );
-              })
+              sortedParticipants.map((participant, index) => (
+                <div
+                  key={participant.id}
+                  className={`score-item ${participant.user_id === user?.id ? 'my-score' : ''}`}
+                >
+                  <span className="rank">{index + 1}위</span>
+                  <span className="name">
+                    {participant.user?.nickname || '익명'}
+                    {participant.user_id === user?.id && ' (나)'}
+                  </span>
+                  <span className="score">{participant.currentScore}점</span>
+                </div>
+              ))
             ) : (
               <div className="score-item">참가자 없음</div>
             )}
           </div>
-          {/* 디버깅용: gameSessions 상태 표시 */}
-          {process.env.NODE_ENV === 'development' && (
-            <div style={{ fontSize: '10px', color: '#666', marginTop: '10px' }}>
-              gameSessions: {gameSessions.length}개
-              {gameSessions.map(s => ` ${s.user?.nickname}:${s.score}`).join(', ')}
-            </div>
-          )}
         </div>
       </div>
 

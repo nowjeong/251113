@@ -330,12 +330,10 @@ export const saveGameSession = async (
   difficulty: string
 ): Promise<{ session: GameSession | null; error: string | null }> => {
   try {
-    console.log('[saveGameSession] 시작:', { userId, roomId, score, correctCount, totalCount, difficulty });
     const accuracy = totalCount > 0 ? (correctCount / totalCount) * 100 : 0;
 
     // 멀티플레이어인 경우 기존 세션 확인
     if (roomId) {
-      console.log('[saveGameSession] 기존 세션 확인:', { roomId, userId });
       const { data: existingSession, error: findError } = await supabase
         .from('game_sessions')
         .select('id, difficulty, played_at')
@@ -343,15 +341,12 @@ export const saveGameSession = async (
         .eq('user_id', userId)
         .maybeSingle();
 
-      console.log('[saveGameSession] 기존 세션 확인 결과:', { 
-        hasSession: !!existingSession, 
-        sessionId: existingSession?.id,
-        error: findError?.message 
-      });
+      if (findError) {
+        console.error('[saveGameSession] 기존 세션 확인 실패:', findError);
+      }
 
       if (existingSession) {
         // 기존 세션 업데이트
-        console.log('[saveGameSession] 기존 세션 업데이트:', existingSession.id);
         
         // 업데이트 실행 (select 없이)
         const { error: updateError } = await supabase
@@ -413,14 +408,12 @@ export const saveGameSession = async (
           };
         }
 
-        console.log('[saveGameSession] 세션 업데이트 성공:', updatedSession.id, '점수:', updatedSession.score);
         // best_score 업데이트는 건너뛰고 바로 반환 (게임 중간 업데이트)
         return { session: updatedSession as GameSession, error: null };
       }
     }
 
     // 1. game_sessions 테이블에 저장 (새 세션)
-    console.log('[saveGameSession] game_sessions 테이블에 저장 시작 (새 세션)');
     const { data, error } = await supabase
       .from('game_sessions')
       .insert([
@@ -442,16 +435,12 @@ export const saveGameSession = async (
       return { session: null, error: error.message };
     }
 
-    console.log('[saveGameSession] game_sessions 저장 성공:', data.id, '점수:', score);
-    
-    // 저장 성공 확인을 위해 로그 강화
     if (!data || !data.id) {
       console.error('[saveGameSession] 저장된 데이터가 없음:', data);
       return { session: null, error: '게임 기록 저장에 실패했습니다.' };
     }
 
     // 2. users 테이블의 best_score 업데이트 (타임아웃 처리)
-    console.log('[saveGameSession] users 테이블 best_score 업데이트 시작');
     
     try {
       // 현재 best_score 확인 (3초 타임아웃)
@@ -472,7 +461,6 @@ export const saveGameSession = async (
         fetchUserError = result.error;
       } catch (err: any) {
         if (err.message === 'FETCH_TIMEOUT') {
-          console.log('[saveGameSession] users 조회 타임아웃 - best_score 업데이트 건너뜀');
           fetchUserError = { code: 'TIMEOUT', message: '조회 타임아웃' };
         } else {
           throw err;
@@ -484,12 +472,9 @@ export const saveGameSession = async (
         // 조회 실패해도 game_sessions는 저장되었으므로 계속 진행
       } else {
         const currentBestScore = currentUser?.best_score || 0;
-        console.log('[saveGameSession] 현재 best_score:', currentBestScore, '새 점수:', score);
         
         // 새 점수가 더 높으면 업데이트
         if (score > currentBestScore) {
-          console.log('[saveGameSession] best_score 업데이트 필요');
-          
           // 업데이트도 타임아웃 처리
           const updatePromise = supabase
             .from('users')
@@ -502,7 +487,6 @@ export const saveGameSession = async (
           
           try {
             await Promise.race([updatePromise, updateTimeoutPromise]);
-            console.log('[saveGameSession] best_score 업데이트 성공:', score);
           } catch (updateErr: any) {
             if (updateErr.message === 'UPDATE_TIMEOUT') {
               console.error('[saveGameSession] best_score 업데이트 타임아웃');
@@ -511,8 +495,6 @@ export const saveGameSession = async (
             }
             // 업데이트 실패해도 game_sessions는 저장되었으므로 계속 진행
           }
-        } else {
-          console.log('[saveGameSession] best_score 업데이트 불필요 (현재 점수가 더 높음)');
         }
       }
     } catch (err) {

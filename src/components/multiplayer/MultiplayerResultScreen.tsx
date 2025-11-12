@@ -18,8 +18,6 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
     let isInitialLoad = true;
     
     const fetchResults = async () => {
-      console.log('[MultiplayerResultScreen] 게임 세션 조회 시작:', room.id);
-      
       // 재시도 로직 추가
       let retries = 3;
       let fetchedSessions: GameSession[] | null = null;
@@ -40,7 +38,6 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
           error = null;
           break;
         } else {
-          console.warn('[MultiplayerResultScreen] 세션 데이터가 null:', '남은 재시도:', retries - 1);
           retries--;
           if (retries > 0) {
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1초 후 재시도
@@ -58,8 +55,6 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
 
         // 데이터가 실제로 변경되었을 때만 업데이트
         if (sessionsHash !== lastSessionsRef.current) {
-          console.log('[MultiplayerResultScreen] 게임 세션 조회 완료:', fetchedSessions.length, '개 (변경 감지)');
-          console.log('[MultiplayerResultScreen] 세션 점수:', fetchedSessions.map(s => ({ userId: s.user_id, score: s.score, nickname: s.user?.nickname })));
           lastSessionsRef.current = sessionsHash;
           setSessions(fetchedSessions);
           if (isInitialLoad) {
@@ -67,7 +62,6 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
             isInitialLoad = false;
           }
         } else {
-          console.log('[MultiplayerResultScreen] 세션 데이터 변경 없음, 업데이트 스킵');
           if (isInitialLoad) {
             setLoading(false);
             isInitialLoad = false;
