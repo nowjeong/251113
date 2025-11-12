@@ -59,6 +59,7 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
         // 데이터가 실제로 변경되었을 때만 업데이트
         if (sessionsHash !== lastSessionsRef.current) {
           console.log('[MultiplayerResultScreen] 게임 세션 조회 완료:', fetchedSessions.length, '개 (변경 감지)');
+          console.log('[MultiplayerResultScreen] 세션 점수:', fetchedSessions.map(s => ({ userId: s.user_id, score: s.score, nickname: s.user?.nickname })));
           lastSessionsRef.current = sessionsHash;
           setSessions(fetchedSessions);
           if (isInitialLoad) {
@@ -85,10 +86,10 @@ export const MultiplayerResultScreen: React.FC<MultiplayerResultScreenProps> = (
     setLoading(true);
     fetchResults();
     
-    // 2초마다 세션 새로고침 (주기 단축으로 실시간성 향상)
+    // 1초마다 세션 새로고침 (더 빠른 반영)
     const refreshInterval = setInterval(() => {
       fetchResults();
-    }, 2000);
+    }, 1000);
 
     return () => {
       clearInterval(refreshInterval);

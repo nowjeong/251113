@@ -413,7 +413,7 @@ export const saveGameSession = async (
           };
         }
 
-        console.log('[saveGameSession] 세션 업데이트 성공:', updatedSession.id);
+        console.log('[saveGameSession] 세션 업데이트 성공:', updatedSession.id, '점수:', updatedSession.score);
         // best_score 업데이트는 건너뛰고 바로 반환 (게임 중간 업데이트)
         return { session: updatedSession as GameSession, error: null };
       }

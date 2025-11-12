@@ -381,6 +381,7 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               // 중복 체크 (같은 ID 또는 같은 사용자의 더 최신 세션이 있으면 스킵)
               const existingById = prev.find((s) => s.id === sessionWithUser.id);
               if (existingById) {
+                console.log('[useRoomRealtime] 동일 ID 세션 존재, 스킵:', sessionWithUser.id);
                 return prev;
               }
               
@@ -389,12 +390,15 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               if (existingByUser) {
                 // 새 세션이 더 최신이면 교체, 아니면 스킵
                 if (new Date(sessionWithUser.played_at) > new Date(existingByUser.played_at)) {
+                  console.log('[useRoomRealtime] 사용자 세션 교체:', sessionWithUser.user_id, existingByUser.score, '->', sessionWithUser.score);
                   const filtered = prev.filter(s => s.user_id !== sessionWithUser.user_id);
                   return [...filtered, sessionWithUser].sort((a, b) => b.score - a.score);
                 }
+                console.log('[useRoomRealtime] 기존 세션이 더 최신, 스킵:', sessionWithUser.user_id);
                 return prev;
               }
               
+              console.log('[useRoomRealtime] 새 세션 추가 (INSERT):', sessionWithUser.user_id, sessionWithUser.score);
               return [...prev, sessionWithUser].sort((a, b) => b.score - a.score);
             });
           }
@@ -435,12 +439,15 @@ export const useRoomRealtime = (roomId: string | null): UseRoomRealtimeReturn =>
               if (existingIndex >= 0) {
                 // 점수가 변경되지 않았으면 업데이트 스킵
                 if (prev[existingIndex].score === sessionWithUser.score) {
+                  console.log('[useRoomRealtime] 점수 변경 없음, 업데이트 스킵:', sessionWithUser.user_id, sessionWithUser.score);
                   return prev;
                 }
+                console.log('[useRoomRealtime] 세션 점수 업데이트:', sessionWithUser.user_id, prev[existingIndex].score, '->', sessionWithUser.score);
                 const updated = [...prev];
                 updated[existingIndex] = sessionWithUser;
                 return updated.sort((a, b) => b.score - a.score);
               } else {
+                console.log('[useRoomRealtime] 새 세션 추가:', sessionWithUser.user_id, sessionWithUser.score);
                 return [...prev, sessionWithUser].sort((a, b) => b.score - a.score);
               }
             });

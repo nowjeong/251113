@@ -85,10 +85,11 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
       alert('점수 저장에 실패했습니다. 네트워크 연결을 확인해주세요.');
     }
 
-    // 잠시 후 게임 오버 화면으로 이동 (저장 성공 여부와 관계없이)
-    setTimeout(() => {
-      onGameOver();
-    }, success ? 1000 : 2000); // 저장 성공 시 1초, 실패 시 2초 후 이동
+    // 저장 완료 후 잠시 대기 (DB 반영 시간 확보)
+    await new Promise(resolve => setTimeout(resolve, success ? 1500 : 2500));
+    
+    console.log('[MultiplayerGameScreen] 게임 오버 화면으로 이동');
+    onGameOver();
   }
 
   // 게임 시작 시 세션 즉시 생성
@@ -164,17 +165,17 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
             );
             
             if (result.error) {
-              console.error('[MultiplayerGameScreen] 실시간 점수 업데이트 실패:', result.error);
+              console.error('[MultiplayerGameScreen] 실시간 점수 업데이트 실패:', result.error, '남은 재시도:', retries - 1);
               retries--;
               if (retries > 0) {
                 await new Promise(resolve => setTimeout(resolve, 500)); // 0.5초 후 재시도
               }
             } else {
-              console.log('[MultiplayerGameScreen] 실시간 점수 업데이트 성공:', stats.score);
+              console.log('[MultiplayerGameScreen] 실시간 점수 업데이트 성공:', stats.score, '세션 ID:', result.session?.id);
               success = true;
             }
           } catch (error) {
-            console.error('[MultiplayerGameScreen] 실시간 점수 업데이트 예외:', error);
+            console.error('[MultiplayerGameScreen] 실시간 점수 업데이트 예외:', error, '남은 재시도:', retries - 1);
             retries--;
             if (retries > 0) {
               await new Promise(resolve => setTimeout(resolve, 500)); // 0.5초 후 재시도
@@ -184,6 +185,9 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
         
         if (!success) {
           console.error('[MultiplayerGameScreen] 실시간 점수 업데이트 최종 실패 (재시도 3회 실패)');
+        } else {
+          // 업데이트 성공 후 잠시 대기 (DB 반영 시간)
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     }, 2000); // 3초에서 2초로 단축
@@ -260,16 +264,25 @@ export const MultiplayerGameScreen: React.FC<MultiplayerGameScreenProps> = ({ ro
   const participantScores = useMemo(() => {
     const scoreMap = new Map<string, number>();
     
-    // 게임 세션에서 점수 매핑
+    // 게임 세션에서 점수 매핑 (모든 플레이어 포함)
     gameSessions.forEach(session => {
       scoreMap.set(session.user_id, session.score);
+      console.log('[MultiplayerGameScreen] 게임 세션 점수:', session.user_id, '=>', session.score);
     });
     
-    // 현재 플레이어는 로컬 점수 사용
+    // 현재 플레이어도 gameSessions에서 가져오되, 없으면 로컬 점수 사용
     if (user?.id) {
-      scoreMap.set(user.id, stats.score);
+      const sessionScore = gameSessions.find(s => s.user_id === user.id)?.score;
+      if (sessionScore !== undefined) {
+        scoreMap.set(user.id, sessionScore);
+        console.log('[MultiplayerGameScreen] 현재 플레이어 점수 (DB):', sessionScore);
+      } else {
+        scoreMap.set(user.id, stats.score);
+        console.log('[MultiplayerGameScreen] 현재 플레이어 점수 (로컬):', stats.score);
+      }
     }
     
+    console.log('[MultiplayerGameScreen] 전체 점수 맵:', Array.from(scoreMap.entries()));
     return scoreMap;
   }, [gameSessions, user?.id, stats.score]);
 
